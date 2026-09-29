@@ -133,3 +133,7 @@ Markdown 资料会持续保留，与网站共用同一份正文，方便离线�
 特别致敬并感谢 **[Hansimov/csapp](https://github.com/Hansimov/csapp)**。
 
 本项目整理正文所使用的 **OCR 源文件来自该仓库**。它为后续的文字核对、章节拆分以及 Markdown 整理提供了重要基础。感谢原仓库维护者和贡献者对 CSAPP 学习资料的整理与分享，也欢迎大家访问原仓库。
+
+同时感谢 **Randal E. Bryant** 和 **David R. O’Hallaron** 两位作者创作了《Computer Systems: A Programmer’s Perspective》（CSAPP），为读者理解计算机系统提供了系统而清晰的知识框架。
+
+感谢 **Pearson** 对 CSAPP 的出版与传播，也感谢 [CSAPP 官方网站](https://csapp.cs.cmu.edu/3e/) 提供的前言、图表、实验和其他学习资料。
