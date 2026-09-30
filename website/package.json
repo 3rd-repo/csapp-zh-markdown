@@ -1,0 +1,9 @@
+{
+  "name": "csapp-reader-checks",
+  "private": true,
+  "scripts": {
+    "test": "node --test tests/reader.test.cjs",
+    "test:search": "node --test tests/search.test.cjs"
+  },
+  "devDependencies": {"jsdom": "26.1.0"}
+}

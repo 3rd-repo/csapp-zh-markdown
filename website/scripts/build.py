@@ -9,6 +9,8 @@ import shutil
 from pathlib import Path
 from urllib.parse import unquote, urlsplit
 
+from PIL import Image
+
 HERE = Path(__file__).resolve().parents[1]
 ROOT = HERE.parent
 OUT = HERE / 'build'
@@ -22,6 +24,29 @@ def title(path):
     if not match:
         raise ValueError(f'Missing title: {path}')
     return match[1].strip()
+
+
+def image_html(path, url, alt, eager=False):
+    with Image.open(path) as image:
+        width, height = image.size
+    return (f'<img class="reader-figure" src="{html.escape(url, quote=True)}" '
+            f'alt="{html.escape(alt, quote=True)}" width="{width}" height="{height}" '
+            f'loading="{"eager" if eager else "lazy"}" decoding="async">')
+
+
+def lab_sections(directory):
+    refs = []
+    for match in chapters.LINK.finditer((directory/'README.md').read_text(encoding='utf-8-sig')):
+        url = urlsplit(match[2].strip('<>'))
+        if url.scheme or url.netloc:
+            continue
+        path = (directory/unquote(url.path)).resolve()
+        if path.suffix == '.md' and path.is_file() and path not in refs:
+            refs.append(path)
+    # Keep any future unlisted supplements reachable without disturbing lab order.
+    refs.extend(p.resolve() for p in sorted(directory.rglob('*.md'))
+                if p.name != 'README.md' and p.resolve() not in refs)
+    return refs
 
 
 def generate():
@@ -51,9 +76,11 @@ def generate():
     for source, dest in mapping.items():
         text = source.read_text(encoding='utf-8-sig')
         seen = {}
+        image_count = 0
 
         def transform(line):
             def link(match):
+                nonlocal image_count
                 raw = match[2].strip('<>')
                 u = urlsplit(raw)
                 if u.scheme or u.netloc or not u.path:
@@ -73,7 +100,9 @@ def generate():
                 if match[1].startswith('!'):
                     # Raw images preserve alt text without Quarto inventing captions.
                     alt = match[1][2:-2]
-                    return f'<img src="{html.escape(url, quote=True)}" alt="{html.escape(alt, quote=True)}">'
+                    markup = image_html(resolved, url, alt, eager=image_count == 0)
+                    image_count += 1
+                    return markup
                 return match[1]+'<'+url+'>'+match[3]
             line = chapters.LINK.sub(link, line)
             h = re.match(r'^(#{1,6})\s+(.+?)\s*$', line)
@@ -91,6 +120,10 @@ def generate():
         meta = {'title':title(source),'execute':{'enabled':False}}
         if source.name == 'chapter.md':
             meta.update({'search':False,'page-navigation':False})
+        elif source.name == 'README.md' and source.parent != ROOT:
+            meta['search'] = False
+        if source.name == '练习题答案.md':
+            meta['title'] = title(source.parent/'README.md') + ' · ' + title(source)
         page = OUT/dest
         page.parent.mkdir(parents=True, exist_ok=True)
         page.write_text('---\n'+json.dumps(meta, ensure_ascii=False)+'\n---\n\n'+body, encoding='utf-8')
@@ -105,7 +138,7 @@ def generate():
     for d in dirs:
         index = d/'README.md'
         if d.name == '实验':
-            refs = [p for p in sorted(d.rglob('*.md')) if p != index]
+            refs = lab_sections(d)
         else:
             refs = [(d/unquote(urlsplit(r).path)).resolve() for r in chapters.section_links(index.read_text(encoding='utf-8-sig'))]
             if (d/'练习题答案.md').exists():
@@ -124,10 +157,19 @@ def generate():
             'sidebar':{'style':'docked','collapse-level':1,'contents':contents},
             'page-footer':{'left':'深入理解计算机系统 · 第三版', 'right':[{'text':'GitHub','href':'https://github.com/SunnyMaria/csapp-zh-markdown'}]},
         },
-        'format':{'html':{'theme':{'light':'cosmo','dark':'darkly'},'css':'styles.css','toc':True,'toc-title':'本页目录','toc-depth':3,'number-sections':False,'code-copy':True,'code-overflow':'scroll','anchor-sections':True,'smooth-scroll':True,'link-external-newwindow':True}},
+        'format':{'html':{
+            'theme':{'light':['cosmo','local-fonts.scss'],'dark':['darkly','local-fonts.scss']},
+            'grid':{'sidebar-width':'260px','body-width':'780px','margin-width':'180px','gutter-width':'1.5rem'},
+            'css':'styles.css','include-after-body':'reader.html',
+            'toc':True,'toc-title':'本页目录','toc-depth':3,'number-sections':False,
+            'code-copy':True,'code-overflow':'scroll','anchor-sections':True,
+            'smooth-scroll':False,'link-external-newwindow':False}},
     }
     (OUT/'_quarto.yml').write_text(json.dumps(config,ensure_ascii=False,indent=2),encoding='utf-8')
     shutil.copy2(HERE/'styles/reader.css',OUT/'styles.css')
+    shutil.copy2(HERE/'styles/local-fonts.scss',OUT/'local-fonts.scss')
+    shutil.copy2(HERE/'scripts/reader.js',OUT/'reader.js')
+    (OUT/'reader.html').write_text('<script src="/reader.js" defer></script>\n', encoding='utf-8')
     (OUT/'manifest.json').write_text(json.dumps({'pages':manifest,'assets':{p.relative_to(ROOT).as_posix():v.as_posix() for p,v in assets.items()}},ensure_ascii=False,indent=2),encoding='utf-8')
     print(f'Generated {len(mapping)} pages and copied {len(assets)} assets; book sources unchanged.')
 

@@ -41,13 +41,23 @@ jobs:
           python3 维护工具/tools/check_supplements.py
 
       - name: Generate reading pages
-        run: python3 website/scripts/build.py
+        run: |
+          python3 -m pip install -r website/requirements.txt
+          python3 -m unittest discover -s website/tests -p 'test_*.py'
+          python3 website/scripts/build.py
+
+      - name: Verify reading interactions
+        run: |
+          npm ci --prefix website --ignore-scripts
+          npm test --prefix website
 
       - name: Render website
         run: quarto render website/build
 
       - name: Verify website links and assets
-        run: python3 website/scripts/check.py
+        run: |
+          python3 website/scripts/check.py
+          npm run test:search --prefix website
 
       - name: Upload verified website
         uses: actions/upload-pages-artifact@v3
